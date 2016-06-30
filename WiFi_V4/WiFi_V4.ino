@@ -15,31 +15,36 @@
 #include <ESP8266WebServer.h>
 #include <PubSubClient.h>
 
-// Variables
+// Timeout for connecting to WiFi
 #define connection_timeout 30
-#define ap_switch 5
-#define green_led 4
+
+// LED'S
+int rgb_leds[] = {
+  4, 0, 14
+};
+
+// Buttons
+int buttons[] = {
+  5
+};
 
 // Access Point Variables
 const char WiFiAPPSK[] = "appassword";
 ESP8266WebServer server(80);
 
 // MQTT Settings
-const char* mqtt_server = "192.168.0.12";
 WiFiClient espClient;
+const char* mqtt_server = "pi.frooplexp.com";
 PubSubClient client(espClient);
 
 void setup() {
 
-  // Setting direction of LED's
-  pinMode(green_led, OUTPUT);
-
-  digitalWrite(ap_switch, LOW);
+  // Initialising the inputs/outputs
+  initialise();
   
-  // Setting direction of button
-  pinMode(ap_switch, INPUT);
   // Starting the Serial bus
   Serial.begin(115200);
+  
   // Switching to WiFi Station
   WiFi.mode(WIFI_STA);
 
@@ -49,15 +54,6 @@ void setup() {
   // Setting up MQTT
   client.setServer(mqtt_server, 1883);
   client.setCallback(callback); 
-
-  // Checking connection
-  if (WiFi.status() != WL_CONNECTED) {
-    // Not connected
-    Serial.print("Not connected...");
-  } else if (WiFi.status() == WL_CONNECTED) {
-    // Connected!
-    Serial.print("Connected to WiFi...");
-  }
 
   // Webserver stuff for config
   server.on("/", render_home); // Home Page
@@ -76,8 +72,8 @@ void setup() {
     int network_password_len = network_password.length() + 1;
 
     // Creating the Character sets
-    char ssid[network_name_len];
-    char password[network_password_len];
+    char ssid[network_name.length() + 1];
+    char password[network_password.length() + 1];
     
     // Converting
     network_name.toCharArray(ssid, network_name_len);
@@ -104,7 +100,7 @@ void setup() {
 void loop() {
 
   // Listening for AP Switch
-  if (digitalRead(ap_switch) == HIGH) {
+  if (digitalRead(buttons[0]) == HIGH) {
     turn_on_ap();
   }
 
@@ -120,31 +116,52 @@ void loop() {
             
 }
 
+// Used to initialise the Components
+void initialise() {
+
+  // Looping through and initialising each switch
+  for (int i = 0; i < sizeof(buttons); i++) {
+    pinMode(buttons[i], INPUT);
+    digitalWrite(buttons[i], LOW);    
+  }
+  
+  // Looping through and initailising each LED
+  for (int i = 0; i < sizeof(rgb_leds); i++) {
+    pinMode(rgb_leds[i], OUTPUT);
+    digitalWrite(rgb_leds[i], LOW);
+  }
+  
+}
+
 // Used to reconnect to MQTT on fail
 void reconnect() {
+  
   while (!client.connected()) { // As long as were not connected
+
+    // Letting 'em know
     Serial.println("Attempting MQTT Connection...");
+    
     // Attempting connection
     if (client.connect("ESP8266Client")) { // This server was set in the void setup()
+      
       // We're back online!
       Serial.println("Connected to MQTT!");
       // Subscribing to a TOPIC
       client.subscribe("noval_iot");
     } else {
+      
       // Failed to connect
       Serial.println("Failed to connect to MQTT Broker, retrying in 5 seconds...");
       delay(5000);
     }
   }
+  
 }
 
 // MQTT Callback, called when we get a new message
 void callback(char* topic, byte* payload, unsigned int length) {
-  
-  if (String((char)payload[0]) == "g") {
-      digitalWrite(green_led, String((char)payload[1]).toInt());
-  }
-  
+  // Turning on/off the Desired LED
+  digitalWrite(rgb_leds[String((char)payload[0]).toInt()], String((char)payload[1]).toInt());
 }
 
 void render_home() {
