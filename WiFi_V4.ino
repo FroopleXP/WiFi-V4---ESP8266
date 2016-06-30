@@ -25,7 +25,7 @@ const char WiFiAPPSK[] = "appassword";
 ESP8266WebServer server(80);
 
 // MQTT Settings
-const char* mqtt_server = "192.168.0.12";
+const char* mqtt_server = "pi.frooplexp.com";
 WiFiClient espClient;
 PubSubClient client(espClient);
 
